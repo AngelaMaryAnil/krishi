@@ -58,6 +58,7 @@ def register():
         'address': data.get('address'),
         'pincode': data.get('pincode'),
         'password': hashed_password,
+        'uniqueId': data.get('uniqueId'),
         'role': data['role']
     }
     users_collection.insert_one(user)
@@ -92,7 +93,8 @@ def login():
         'phone': user['phone'],
         'address': user['address'],
         'pincode': user['pincode'],
-        'role': user['role']
+        'uniqueId': user['uniqueId'],
+        'role': user.get('role', 'user')
     }
     logger.info("User logged in successfully: %s", user_data)
     return jsonify(user_data), 200
