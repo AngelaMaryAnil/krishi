@@ -12,15 +12,20 @@ const stats = [
 
 export const SellerDashboard = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [formData, setFormData] = useState<Pick<Product, 'name' | 'description' | 'price' | 'stock' | 'category' | 'krishiBhavan' | 'imageUrl'>>({
+  const userType = localStorage.getItem("userType") || "unregistered"; // Assume userType is stored in localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const [formData, setFormData] = useState<Pick<Product, 'name' | 'description' | "price_registered" | "price_unregistered" | 'stock' | 'category' | 'krishiBhavan' | 'imageUrl'>>({
     name: '',
     description: '',
-    price: 0,
+    price_registered: 0,
+    price_unregistered: 0,
     stock: 0,
     category: 'Seeds',
-    krishiBhavan: 'Krishi Bahavan 1',
+    krishiBhavan: user?.name || "", // Auto-fill Krishi Bhavan with seller username
     imageUrl: ''
   });
+
   const [bookings] = useState<Booking[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -29,44 +34,59 @@ export const SellerDashboard = () => {
   const [processingBookingId, setProcessingBookingId] = useState<string | null>(null);
 
   // Fetch products from MongoDB when the component mounts
-  const fetchProducts = async () => {  
+  const fetchProducts = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/products`);
-      if (!response.ok) throw new Error('Failed to fetch products');
-  
+      const response = await fetch(`http://localhost:5000/products?user_type=${userType}`);
+      if (!response.ok) throw new Error("Failed to fetch products");
+
       const data = await response.json();
       setProducts(data);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error("Error fetching products:", error);
     }
   };
-  
-  // Fetch products on mount
+
   useEffect(() => {
-    fetchProducts();
+    fetch("http://127.0.0.1:5000/products?user_type=unregistered")
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Fetched products:", data); // Debugging: Check API response
+        setProducts(data);
+      })
+      .catch((error) => console.error("Error fetching products:", error));
   }, []);
-      
+
+  useEffect(() => {
+    // Fetch seller username from localStorage or authentication context
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (user && user.name) {
+      setFormData((prevData) => ({
+        ...prevData,
+        krishiBhavan: user.name, // Auto-fill Krishi Bhavan with seller username
+      }));
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'price' || name === 'stock' ? Number(value) : value
+      [name]: ['registeredPrice', 'unregisteredPrice', 'stock'].includes(name) ? Number(value) : value
     }));
   };
 
   const handleAddOrUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     try {
-      let response;  
+      let response;
       if (selectedProduct) {
         response = await fetch(`http://localhost:5000/products/${selectedProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-  
+
         if (!response.ok) throw new Error('Failed to update product');
       } else {
         response = await fetch('http://localhost:5000/products', {
@@ -74,28 +94,30 @@ export const SellerDashboard = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-  
+
         if (!response.ok) throw new Error('Failed to add product');
       }
-  
+
       // ✅ Fetch latest products from backend
-      await fetchProducts(); 
-  
+      await fetchProducts();
+
       setShowAddModal(false);
       setSelectedProduct(null);
       setFormData({
         name: '',
         description: '',
-        price: 0,
+        price_registered: 0,
+        price_unregistered: 0,
         stock: 0,
         category: 'Seeds',
-        krishiBhavan: 'Krishi Bahavan 1',
+        krishiBhavan: user?.name || "", // Ensure Krishi Bhavan is reset properly
         imageUrl: '',
       });
     } catch (error) {
       console.error('Error adding/updating product:', error);
     }
   };
+
   
 
   const handleEdit = (product: Product) => {
@@ -103,10 +125,11 @@ export const SellerDashboard = () => {
     setFormData({
       name: product.name,
       description: product.description,
-      price: product.price,
+      price_registered: product.price_registered,
+      price_unregistered: product.price_unregistered,
       stock: product.stock,
       category: product.category,
-      krishiBhavan: product.krishiBhavan,
+      krishiBhavan: product.krishiBhavan, // Keep the original seller's username
       imageUrl: product.imageUrl
     });
     setShowAddModal(true);
@@ -319,7 +342,8 @@ export const SellerDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Krishi Bhavan</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price(registered user)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price(un-registered user)</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -347,12 +371,16 @@ export const SellerDashboard = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
-                          {product.krishiBhavan}
+                        {formData.krishiBhavan} {/* Display seller's username instead */}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-medium text-gray-800">₹{product.price}</span>
+                        <span className="font-medium text-gray-800">₹{product.price_registered}</span> /
                       </td>
+                      <td className="px-6 py-4">
+                      <td className="px-6 py-4">
+                        <span className="font-medium text-gray-800">₹{product.price_unregistered}</span> /
+                      </td>                      </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-sm ${
                           product.stock > 50 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -415,14 +443,24 @@ export const SellerDashboard = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price (₹)
+                    Price for Registered User (₹)
                   </label>
                   <input
                     type="number"
-                    name="price"
-                    value={formData.price || ""}
+                    name="price_registered"
+                    value={formData.price_registered}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Price for registered users"
+                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price for Un-Registered User (₹)
+                  </label>
+                  <input
+                    type="number"
+                    name="price_unregistered"
+                    value={formData.price_unregistered}
+                    onChange={handleChange}
+                    placeholder="Price for unregistered users"
                   />
                 </div>
                 <div>
@@ -442,15 +480,13 @@ export const SellerDashboard = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Krishi Bhavan
                 </label>
-                <select
+                <input
+                  type="text"
                   name="krishiBhavan"
                   value={formData.krishiBhavan}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="Krishi Bhavan 1">Krishi Bhavan 1</option>
-                  <option value="Krishi Bhavan 2">Krishi Bhavan 2</option>
-                </select>
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

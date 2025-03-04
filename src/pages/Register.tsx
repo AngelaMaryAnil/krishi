@@ -69,12 +69,20 @@ export const Register = () => {
       if (!formData.uniqueId.trim()) {
         newErrors.uniqueId = 'Unique ID is required for registered users';
       } else if (
-        !/^SL(100[0-9]|1[0-9]{3}|2[0-9]{3}|3000)$/.test(formData.uniqueId) &&
-        !/^CR(100[0-9]|1[0-9]{3}|2000)$/.test(formData.uniqueId)
+        !/^SL000[1-3]\d{3}$/.test(formData.uniqueId) ||
+        parseInt(formData.uniqueId.substring(5), 10) < 1000 ||
+        parseInt(formData.uniqueId.substring(5), 10) > 3000
       ) {
-        newErrors.uniqueId = 'Invalid Unique ID';
+        if (
+          !/^CR[1-3]\d{6}$/.test(formData.uniqueId) ||
+          parseInt(formData.uniqueId.substring(2), 10) < 1000000 ||
+          parseInt(formData.uniqueId.substring(2), 10) > 3000000
+        ) {
+          newErrors.uniqueId = 'Unique ID must be between SL0001000 to SL0003000 or CR1000000 to CR3000000';
+        }
       }
     }
+    
   
     setErrors(newErrors);
   
@@ -88,6 +96,21 @@ export const Register = () => {
     if (!validateForm()) {
       return; // Stop execution if validation fails
     }
+    let assignedSeller = '';
+
+  if (isRegisteredUser) {
+    const uniqueIdNum = parseInt(formData.uniqueId.substring(2), 10);
+    if (uniqueIdNum >= 1000000 && uniqueIdNum <= 1000100) {
+      assignedSeller = 'SL0001001';
+    } else if (uniqueIdNum >= 1000101 && uniqueIdNum <= 1000200) {
+      assignedSeller = 'SL0001002';
+    }
+  }
+
+  const requestData = {
+    ...formData,
+    sellerId: assignedSeller || null, // Attach the assigned seller ID
+  };
   
     await register(formData);
   };
@@ -99,9 +122,9 @@ export const Register = () => {
 
     // Enforce role based on uniqueId
     if (name === 'uniqueId' && isRegisteredUser) {
-      if (/^SL(100[0-9]|1[0-9]{3}|2[0-9]{3}|3000)$/.test(value)) {
+      if (/^SL000[1-9]\d{3}$/.test(value) && parseInt(value.substring(5), 10) <= 3000) {
         updatedFormData.role = 'seller';
-      } else if (/^CR(100[0-9]|1[0-9]{3}|2000)$/.test(value)) {
+      } else if (/^CR[1-2]\d{6}$/.test(value) && parseInt(value.substring(2), 10) <= 3000000) {
         updatedFormData.role = 'customer';
       }
     }
@@ -237,8 +260,8 @@ export const Register = () => {
               {errors.pincode && <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>}
             </div>
             
-            <label className="block font-semibold mb-2">Are you a registered user?</label>
-      <div className="flex gap-4 mb-4">
+           
+    {/*<div className="flex gap-4 mb-4">
         <button
           type="button"
           className={`p-2 w-1/2 rounded ${isRegisteredUser ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
@@ -269,12 +292,12 @@ export const Register = () => {
             className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
               errors.pincode ? 'border-red-300' : 'border-gray-300'
             }`}
-            placeholder="Enter your 6-digit Unique ID"
-            maxLength={6}
+            placeholder="Enter your 9-digit Unique ID"
+            maxLength={9}
           />
           {errors.uniqueId && <p className="text-red-500">{errors.uniqueId}</p>}
         </>
-      )}
+      )} */}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
